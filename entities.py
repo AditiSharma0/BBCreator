@@ -8,7 +8,7 @@ import pygame as pg             # The Pygame module
 import config as cfg            # The configuration file containing parameters about the game
 import itertools as itt         # Functions creating iterators for efficient looping
 import numpy as np              # Module for scientific computing with Python
-import math                     # Module for general-purpose mathematical functions
+import math                     # Module for general-purpose mathematical functions 
 
 class Entity(pg.sprite.Sprite):
     """
@@ -27,7 +27,7 @@ class Entity(pg.sprite.Sprite):
         """
 
         # Call the parent class (Sprite) constructor
-        pg.sprite.Sprite.__init__(self)
+        super().__init__()
 
         # Set the sprite for the entity. Save a copy of the original image as a reference
         self.original_image = image
@@ -41,21 +41,7 @@ class Entity(pg.sprite.Sprite):
         self.rect.x = init_x
         self.rect.y = init_y
 
-        # Set up a generator to yield subsequent pygame.Surfaces that will make up the shuffling
-        # animation of the Entitb
-        self.shuffle_cycle = self.generate_shuffle_frames(cfg.NURLET_SHUFFLE_ANGLE)
 
-    def generate_shuffle_frames(self, max_deflection):
-        """
-        Function to create an iterator for the rotation angle per frame of the shuffling animation of the entity
-        :param max_deflection: The maximum angle to which the entity's image rotates
-        :type max_deflection: float
-        :return: An iterator which yields the deflection angle of the subsequent frame in the shuffling animation
-        :rtype: iterator
-        """
-        half_set = list(np.linspace(-1*max_deflection, max_deflection, 20))
-        full_set =  half_set[::-1]+ half_set
-        return itt.cycle(full_set)
 
     def distance_to(self, other):
         """
@@ -86,6 +72,31 @@ class Entity(pg.sprite.Sprite):
         yhat = (its.y - my.y)/dist
         return xhat, yhat
 
+
+class MobileEntity(Entity):
+    """
+    Constructor function for the MobileEntity class
+    """
+    def __init__(self, *args, **kwargs):
+
+        super().__init__(*args, **kwargs)
+
+        # Set up a generator to yield subsequent pygame.Surfaces that will make up the shuffling
+        # animation of the Entity
+        self.shuffle_cycle = self.generate_shuffle_frames(cfg.NURLET_SHUFFLE_ANGLE)
+
+    def generate_shuffle_frames(self, max_deflection):
+        """
+        Function to create an iterator for the rotation angle per frame of the shuffling animation of the entity
+        :param max_deflection: The maximum angle to which the entity's image rotates
+        :type max_deflection: float
+        :return: An iterator which yields the deflection angle of the subsequent frame in the shuffling animation
+        :rtype: iterator
+        """
+        half_set = list(np.linspace(-1*max_deflection, max_deflection, 20))
+        full_set =  half_set[::-1]+ half_set
+        return itt.cycle(full_set)
+
     def shuffle_sprite(self):
         """
         Rotates the image of the entity by a set angle, representing the next frame of the shuffling animation
@@ -104,7 +115,7 @@ class Entity(pg.sprite.Sprite):
         self.rect.move_ip(x, y)                 # Move the bounding box of the entity
 
 
-class Nurlet(Entity):
+class Nurlet(MobileEntity):
     """
     Class representing the inhabitant of Nurltown.
     """
@@ -119,17 +130,18 @@ class Nurlet(Entity):
 
         # Load the image to represent the entity
         sprite = pg.image.load("assets/sprites/pug.png")
-        # sprite = pg.image.load("assets/sprites/nurlet.png")
         sprite = pg.transform.scale(sprite, (80, 80))
-        # sprite = pg.image.load("supreme_leader3.png")
 
         # Call the parent class constructor
-        super(Nurlet, self).__init__(sprite, init_x, init_y)
+        super().__init__(sprite, init_x, init_y)
 
-        # Set the movement speed
+        # Set the movement speed and initial hp
         self.speed = cfg.NURLET_SPEED
+        self.hp = cfg.NURLET_MAX_HP
+        self.duration_invincibility = 0
+        self.score = 0
 
-    def update(self, food, key_input):
+    def update(self, food, hostiles, key_input):
         """
         Function to update the state of the Nurlet. This update phase determines whether the Nurlet
         moves, eats, attacks, or defends, based on its surroundings and the rest of the game state
@@ -142,6 +154,7 @@ class Nurlet(Entity):
         # self.seek_closest(food)
         self.move_by_user(key_input)
         self.eat_nearby(food)
+        self.take_damage(hostiles)
 
     def move_by_user(self, key_input):
         """
@@ -182,13 +195,63 @@ class Nurlet(Entity):
         x, y = [self.speed * i for i in self.unit_vector_to(closest_entity)]
         self.move(x, y)
 
+
     def eat_nearby(self, food):
         """
         Eat any food entities within the reach (bounding boxes colliding) of the Nurlet
         :param food: A group of food entities that currently exist in the game
         :type food: pygame.sprite.Group
         """
-        pg.sprite.spritecollide(self, food, True)
+        #pg.sprite.spritecollide(self, food, True)
+        food_eaten = pg.sprite.spritecollide(self, food, True)
+        self.score += len(food_eaten)
+
+
+    def take_damage(self, hostiles):
+        """
+        Eat any food entities within the reach (bounding boxes colliding) of the Nurlet
+        :param food: A group of food entities that currently exist in the game
+        :type food: pygame.sprite.Group
+        """
+        attacking_hostile = pg.sprite.spritecollide(self, hostiles, False)
+        damage_taken = cfg.HOSTILE_NURLET_STRENGTH * len(attacking_hostile)
+
+        if damage_taken and not self.was_recently_damaged():
+            self.hp -= damage_taken
+            self.hp = max(0,self.hp)
+
+    def was_recently_damaged(self):
+        if self.duration_invincibility:
+            self.duration_invincibility -= 1
+            return True
+        else:
+            self.duration_invincibility = cfg.NURLET_INVINCIBILITY_DURATION
+            return False
+
+
+    def seek_nurlet(self, group):
+        """
+        The Nurlet finds the closest entity in the supplied group and moves towards it
+        :param group: A group of entities that currently exist in the game
+        :type group: pygame.sprite.Group
+        """
+
+        # Initialize variables for closest food
+        closest_distance = math.inf
+        closest_entity = None
+
+
+        # Find the closest entity  
+        for nurlets in group:  
+            dist = self.distance_to(nurlets)
+            if dist < closest_distance:
+                closest_distance = dist
+                closest_entity = nurlets
+
+        # Move towards the closest food at maximum speed
+        x, y = [self.speed * i for i in self.unit_vector_to(closest_entity)]
+        self.move(x, y)
+
 
 class HostileNurlet(Nurlet):
     """
@@ -203,17 +266,19 @@ class HostileNurlet(Nurlet):
         :type init_y: float
         """
 
-        # Load the image to represent the entity
+        # Call the parent class constructor
+        super().__init__(init_x, init_y)
+
+
+        # Load the image to represent the entity and override the Nurlet sprite
         sprite = pg.image.load("assets/sprites/hostile_nurlet.png")
         sprite = pg.transform.scale(sprite, (80, 80))
 
-        # Call the parent class constructor
-        super(HostileNurlet, self).__init__(init_x, init_y)
-
         self.original_image = sprite
         self.image = sprite
+        self.speed = cfg.HOSTILE_NURLET_SPEED
 
-    def update(self, food):
+    def update(self, food, nurlets):
         """
         Function to update the state of the Nurlet. This update phase determines whether the Nurlet
         moves, eats, attacks, or defends, based on its surroundings and the rest of the game state
@@ -222,11 +287,13 @@ class HostileNurlet(Nurlet):
         :param key_input: A sequence of boolean values indicating which keys are pressed
         :type key_input: dict
         """
-
+        if self.hp <= 0:
+            not self.seek_nurlet(nurlets)
+        else:
+            self.seek_nurlet(nurlets)
         self.seek_closest(food)
         self.eat_nearby(food)
-
-
+        
 
 class Food(Entity):
     """
@@ -243,8 +310,6 @@ class Food(Entity):
 
         # Load the image to represent the entity
         sprite = pg.image.load("assets/sprites/bone.png")
-        # sprite = pg.image.load("assets/sprites/red_jelly.png")
-        # sprite = pg.image.load("kimbap copy.png")
 
         # Call the parent class constructor
-        super(Food, self).__init__(sprite, init_x, init_y)
+        super().__init__(sprite, init_x, init_y)
