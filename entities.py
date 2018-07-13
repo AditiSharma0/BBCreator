@@ -141,7 +141,7 @@ class Nurlet(MobileEntity):
         self.duration_invincibility = 0
         self.score = 0
 
-    def update(self, food, hostiles, key_input):
+    def update(self, food, hostiles, key_input, power_ups):
         """
         Function to update the state of the Nurlet. This update phase determines whether the Nurlet
         moves, eats, attacks, or defends, based on its surroundings and the rest of the game state
@@ -155,6 +155,7 @@ class Nurlet(MobileEntity):
         self.move_by_user(key_input)
         self.eat_nearby(food)
         self.take_damage(hostiles)
+        self.eat_powerup(power_ups)
 
     def move_by_user(self, key_input):
         """
@@ -206,6 +207,15 @@ class Nurlet(MobileEntity):
         food_eaten = pg.sprite.spritecollide(self, food, True)
         self.score += len(food_eaten)
 
+
+    def eat_powerup(self, power_ups):
+
+        power_up_eaten = pg.sprite.spritecollide(self, power_ups, True)
+        health_added = cfg.POWER_UP_STRENGTH * len(power_up_eaten)
+
+        if health_added:
+            self.hp += health_added
+            self.hp = min(self.hp, 100)
 
     def take_damage(self, hostiles):
         """
@@ -310,6 +320,25 @@ class Food(Entity):
 
         # Load the image to represent the entity
         sprite = pg.image.load("assets/sprites/bone.png")
+
+        # Call the parent class constructor
+        super().__init__(sprite, init_x, init_y)
+
+class PowerUp(Entity):
+    """
+    Class representing a morsel of food found within Nurltown
+    """
+    def __init__(self, init_x = 0, init_y = 0):
+        """
+        Constructor function for the Food class
+        :param init_x: x coordinate of the initial position in the game
+        :type init_x: float
+        :param init_y: y coordinate of the initial position in the game
+        :type init_y: float
+        """
+
+        # Load the image to represent the entity
+        sprite = pg.image.load("assets/sprites/red_jelly.png")
 
         # Call the parent class constructor
         super().__init__(sprite, init_x, init_y)
