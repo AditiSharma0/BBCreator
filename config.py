@@ -30,3 +30,5 @@ NURLET_SHUFFLE_ANGLE = 15
 
 # The maximum number of food entities which can exist at once in the ecosystem
 MAX_NUM_FOOD = 10
+MAX_NUM_POWERUP = 1
+POWER_UP_STRENGTH = 10
