@@ -43,18 +43,21 @@ def main():
     nurlets = pg.sprite.Group()
     hostiles = pg.sprite.Group()
     food = pg.sprite.Group()
+    power_ups = pg.sprite.Group()
 
     nurlet = ntts.Nurlet(width/2, height/2)
     hostile_nurlets = [ntts.HostileNurlet(*get_random_pos()) for x in range(4)]
     jellies = [ntts.Food(*get_random_pos()) for x in range(cfg.MAX_NUM_FOOD)]
+    red_power = [ntts.PowerUp(*get_random_pos()) for x in range(cfg.MAX_NUM_POWERUP)]
 
-    entity_groups = [food, nurlets, hostiles]
+    entity_groups = [food, nurlets, hostiles, power_ups]
 
     quit_game = 0
 
     nurlets.add(nurlet)
     hostiles.add(hostile_nurlets)
     food.add(jellies)
+    power_ups.add(red_power)
 
     while True:
 
@@ -78,7 +81,7 @@ def main():
         screen.blit(bg, (0,0))
 
         # Update the nurlets
-        nurlets.update(food, hostiles, keys_pressed)
+        nurlets.update(food, hostiles, keys_pressed, power_ups)
 
         # Update the hostiles
         hostiles.update(food, nurlets)
@@ -86,6 +89,10 @@ def main():
         # Replenish food
         num_to_respawn = max(0, cfg.MAX_NUM_FOOD - len(food))
         if num_to_respawn: food.add(ntts.Food(*get_random_pos()))
+
+        #Replenish power ups
+        num_respawn = max(0,cfg.MAX_NUM_POWERUP - len(power_ups))
+        if num_respawn: power_ups.add(ntts.PowerUp(*get_random_pos()))
 
 
         # Redraw the entities
@@ -103,7 +110,7 @@ def main():
         #Display score 
         score_font = pg.font.SysFont('Marker Felt Wide', 30, True)
         score_text = score_font.render('SCORE:'+ str(nurlet.score), False, (255, 255, 255))
-        screen.blit(score_text, (780, 25))
+        screen.blit(score_text, (770, 25))
 
         if quit_game == 1:
             time.sleep(2)
@@ -112,7 +119,7 @@ def main():
 
         if nurlet.hp <= 0 and quit_game == 0:
             font = pg.font.SysFont('Marker Felt Wide', 120, True)
-            game_over_text = font.render('GAME OVER!', False, (255, 0, 0))
+            game_over_text = font.render('GAME OVER!', False, (0, 0, 255))
             screen.blit(game_over_text, (120, height/2 - 60)) 
             quit_game = 1
 
